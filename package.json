@@ -1,0 +1,19 @@
+{
+  "name": "cf-cheating-detector",
+  "version": "0.0.1",
+  "description": "Codeforces cheating detector",
+  "main": "build/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acmASCIS/cf-cheating-detector.git"
+  },
+  "author": "Ahmed Ragab (aragab22@gmail.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/acmASCIS/cf-cheating-detector/issues"
+  },
+  "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme"
+}
