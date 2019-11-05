@@ -4,7 +4,9 @@
   "description": "Codeforces cheating detector",
   "main": "build/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node build/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -15,5 +17,17 @@
   "bugs": {
     "url": "https://github.com/acmASCIS/cf-cheating-detector/issues"
   },
-  "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme"
+  "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^2.6.1",
+    "@typescript-eslint/parser": "^2.6.1",
+    "eslint": "^6.6.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-config-prettier": "^6.5.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-prettier": "^3.1.1",
+    "prettier": "^1.18.2",
+    "ts-node": "^8.4.1",
+    "typescript": "^3.6.4"
+  }
 }
