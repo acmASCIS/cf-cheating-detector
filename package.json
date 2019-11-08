@@ -9,7 +9,7 @@
     "start:client": "cd client && npm start",
     "build": "tsc",
     "build:client": "cd client && npm run build",
-    "postinstall": "npm run build && npm run build:client"
+    "postinstall": "npm run build && cd client && npm install && cd .. && npm run build:client"
   },
   "repository": {
     "type": "git",
