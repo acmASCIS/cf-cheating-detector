@@ -18,20 +18,27 @@
     "url": "https://github.com/acmASCIS/cf-cheating-detector/issues"
   },
   "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme",
+  "dependencies": {
+    "@types/lodash": "^4.14.145",
+    "axios": "^0.19.0",
+    "cheerio": "^1.0.0-rc.3",
+    "codeforces-client": "0.0.1",
+    "dotenv": "^8.2.0",
+    "lodash": "^4.17.15",
+    "puppeteer": "^2.0.0"
+  },
   "devDependencies": {
     "@types/cheerio": "^0.22.13",
+    "@types/puppeteer": "^1.20.2",
     "@types/request": "^2.48.3",
     "@typescript-eslint/eslint-plugin": "^2.6.1",
     "@typescript-eslint/parser": "^2.6.1",
-    "cheerio": "^1.0.0-rc.3",
-    "chromeless": "^1.5.2",
     "eslint": "^6.6.0",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-config-prettier": "^6.5.0",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-prettier": "^3.1.1",
     "prettier": "^1.18.2",
-    "request": "^2.88.0",
     "ts-node": "^8.4.1",
     "typescript": "^3.6.4"
   }

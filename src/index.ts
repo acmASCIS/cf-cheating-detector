@@ -1,7 +1,14 @@
-import Cheating_Detector from './cheating-detector';
+import dotenv from 'dotenv';
 
-const cheatingDetector = new Cheating_Detector('Rojer','As102030-=','ZR9JZ5TsFc','217033');
+import CheatingDetector from './cheating-detector';
 
-const res = cheatingDetector.getSourceCode('64417726');
+dotenv.config();
 
-console.log(res);
+const cheatingDetector = new CheatingDetector(
+  process.env.CF_HANDLE as string,
+  process.env.CF_PASSWORD as string,
+  'fF0nGsdspd',
+  '258480',
+  0.9,
+);
+cheatingDetector.run().then(console.log);
