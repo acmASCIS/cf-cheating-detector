@@ -3,6 +3,7 @@ import puppeteer from 'puppeteer';
 import axios from 'axios';
 import CodeforcesClient from 'codeforces-client';
 import _ from 'lodash';
+import compareCode from './compare-code';
 
 export default class CheatingDetector {
   constructor(
@@ -28,6 +29,8 @@ export default class CheatingDetector {
     submissions.forEach((submission: any, index: number) => {
       // eslint-disable-next-line no-param-reassign
       submission.code = codes[index];
+      // eslint-disable-next-line no-param-reassign
+      submission.url = this.generateSubmissionUrl(submission.id);
     });
 
     const cheatingCases: any[] = [];
@@ -36,19 +39,26 @@ export default class CheatingDetector {
     Object.values(groupedSubmissions).forEach(problemSubmissions => {
       for (let i = 0; i < problemSubmissions.length; i += 1) {
         for (let j = i + 1; j < problemSubmissions.length; j += 1) {
-          // TODO: check function
-          const matchingPercentage = 0.9;
-          if (matchingPercentage >= this.requiredPercentage) {
-            cheatingCases.push({
-              first: problemSubmissions[i],
-              second: problemSubmissions[j],
-            });
+          if (problemSubmissions[i].handle !== problemSubmissions[j].handle) {
+            const matchingPercentage = compareCode(
+              problemSubmissions[i].code,
+              problemSubmissions[j].code,
+            );
+            if (matchingPercentage >= this.requiredPercentage) {
+              cheatingCases.push({
+                first: problemSubmissions[i],
+                second: problemSubmissions[j],
+              });
+            }
           }
         }
       }
     });
 
-    return cheatingCases;
+    return cheatingCases.map(cheatingCase => ({
+      first: _.omit(cheatingCase.first, 'code'),
+      second: _.omit(cheatingCase.second, 'code'),
+    }));
   };
 
   private async login() {
@@ -90,8 +100,8 @@ export default class CheatingDetector {
     return [];
   }
 
-  public getSourceCode = async (submissionId: string, cookies: string) => {
-    const submissionUrl = `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
+  private getSourceCode = async (submissionId: string, cookies: string) => {
+    const submissionUrl = this.generateSubmissionUrl(submissionId);
 
     const result = await axios.get(submissionUrl, {
       headers: {
@@ -102,4 +112,8 @@ export default class CheatingDetector {
     const $ = cheerio.load(result.data);
     return $('.prettyprint').text();
   };
+
+  private generateSubmissionUrl(submissionId: string) {
+    return `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
+  }
 }
