@@ -1,4 +1,5 @@
 {
+  "eslint.workingDirectories": ["src"],
   "eslint.autoFixOnSave": true,
   "eslint.validate": [
     "javascript",

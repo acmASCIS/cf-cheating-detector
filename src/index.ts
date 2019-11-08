@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
+import cors from 'cors';
+import path from 'path';
 
 import CheatingDetector from './cheating-detector';
 
@@ -7,6 +9,9 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(cors());
+
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 app.post('/api/cheating-detection', async (req, res) => {
   const { groupId, contestId, matchingPercentageThreshold } = req.body;
@@ -18,18 +23,21 @@ app.post('/api/cheating-detection', async (req, res) => {
     matchingPercentageThreshold,
   );
 
-  const RETRIES = 200;
+  const RETRIES = 10;
   for (let i = 0; i < RETRIES; i += 1) {
     try {
       // eslint-disable-next-line no-await-in-loop
       const result = await cheatingDetector.run();
-      console.log(result);
       res.send(result);
       break;
     } catch (error) {
       console.log(`ATTEMPT [${i + 1}] FAILED.`);
     }
   }
+});
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;

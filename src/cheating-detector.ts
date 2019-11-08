@@ -46,6 +46,7 @@ export default class CheatingDetector {
             );
             if (matchingPercentage >= this.requiredPercentage) {
               cheatingCases.push({
+                matchingPercentage,
                 first: problemSubmissions[i],
                 second: problemSubmissions[j],
               });
@@ -56,6 +57,7 @@ export default class CheatingDetector {
     });
 
     return cheatingCases.map(cheatingCase => ({
+      ...cheatingCase,
       first: _.omit(cheatingCase.first, 'code'),
       second: _.omit(cheatingCase.second, 'code'),
     }));
