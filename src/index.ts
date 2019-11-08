@@ -29,11 +29,14 @@ app.post('/api/cheating-detection', async (req, res) => {
       // eslint-disable-next-line no-await-in-loop
       const result = await cheatingDetector.run();
       res.send(result);
-      break;
+      return;
     } catch (error) {
       console.log(`ATTEMPT [${i + 1}] FAILED.`);
+      console.log(error);
     }
   }
+
+  res.status(500).send();
 });
 
 app.get('*', (req, res) => {
