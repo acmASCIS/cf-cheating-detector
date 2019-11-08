@@ -5,6 +5,8 @@ import path from 'path';
 
 import CheatingDetector from './cheating-detector';
 
+const DelayedResponse = require('http-delayed-response');
+
 dotenv.config();
 
 const app = express();
@@ -23,20 +25,27 @@ app.post('/api/cheating-detection', async (req, res) => {
     matchingPercentageThreshold,
   );
 
-  const RETRIES = 10;
-  for (let i = 0; i < RETRIES; i += 1) {
-    try {
-      // eslint-disable-next-line no-await-in-loop
-      const result = await cheatingDetector.run();
-      res.send(result);
-      return;
-    } catch (error) {
-      console.log(`ATTEMPT [${i + 1}] FAILED.`);
-      console.log(error);
-    }
-  }
+  const delayed = new DelayedResponse(req, res);
+  delayed.wait();
+  delayed.end(
+    (async () => {
+      const RETRIES = 10;
+      for (let i = 0; i < RETRIES; i += 1) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const result = await cheatingDetector.run();
+          return result;
+        } catch (error) {
+          console.log(`ATTEMPT [${i + 1}] FAILED.`);
+          console.log(error);
+        }
+      }
 
-  res.status(500).send();
+      return undefined;
+    })(),
+  );
+
+  // res.status(500).send();
 });
 
 app.get('*', (req, res) => {

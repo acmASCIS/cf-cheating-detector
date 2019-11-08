@@ -6,6 +6,12 @@ import _ from 'lodash';
 import compareCode from './compare-code';
 
 export default class CheatingDetector {
+  private codesMemo: Map<string, string> = new Map<string, string>();
+
+  private cookies: string | undefined = undefined;
+
+  private submissions: any[] | undefined = undefined;
+
   constructor(
     private cfUsername: string,
     private cfPassword: string,
@@ -15,13 +21,26 @@ export default class CheatingDetector {
   ) {}
 
   public run = async () => {
-    const authCookies = await this.login();
+    let authCookies: any[];
+    let parsedCookies: string;
 
-    const parsedCookies = authCookies
-      .map(cookie => `${cookie.name}=${cookie.value}`)
-      .join('; ');
+    if (!this.cookies) {
+      authCookies = await this.login();
+      parsedCookies = authCookies
+        .map(cookie => `${cookie.name}=${cookie.value}`)
+        .join('; ');
+      this.cookies = parsedCookies;
+    } else {
+      parsedCookies = this.cookies;
+    }
 
-    const submissions: any = await this.generateSubmissionObjects();
+    const submissions: any = this.submissions
+      ? this.submissions
+      : await this.generateSubmissionObjects();
+    console.log(
+      'TCL: CheatingDetector -> publicrun -> submissions',
+      submissions,
+    );
     const codePromises = submissions.map((submission: any) =>
       this.getSourceCode(submission.id, parsedCookies),
     );
@@ -65,14 +84,17 @@ export default class CheatingDetector {
 
   private async login() {
     const loginUrl = 'https://codeforces.com/enter';
-    const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox'],
+      timeout: 0,
+    });
     const page = await browser.newPage();
-    await page.goto(loginUrl);
+    await page.goto(loginUrl, { timeout: 0 });
 
     await page.type('input[name="handleOrEmail"]', this.cfUsername);
     await page.type('input[name="password"]', this.cfPassword);
     await page.click('input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: 'load' });
+    await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
     const cookies = await page.cookies();
     browser.close();
 
@@ -90,8 +112,11 @@ export default class CheatingDetector {
 
     if (submissions.status === 'OK') {
       return submissions.result
-        .filter(submission =>
-          submission.verdict ? submission.verdict === 'OK' : false,
+        .filter(
+          submission =>
+            (submission.verdict ? submission.verdict === 'OK' : false) &&
+            submission.author.participantType === 'CONTESTANT' &&
+            submission.problem.index === 'C',
         )
         .map(submission => ({
           id: submission.id,
@@ -103,6 +128,10 @@ export default class CheatingDetector {
   }
 
   private getSourceCode = async (submissionId: string, cookies: string) => {
+    if (this.codesMemo.get(submissionId)) {
+      return this.codesMemo.get(submissionId);
+    }
+
     const submissionUrl = this.generateSubmissionUrl(submissionId);
 
     const result = await axios.get(submissionUrl, {
@@ -112,7 +141,8 @@ export default class CheatingDetector {
     });
 
     const $ = cheerio.load(result.data);
-    return $('.prettyprint').text();
+    this.codesMemo.set(submissionId, $('.prettyprint').text());
+    return this.codesMemo.get(submissionId);
   };
 
   private generateSubmissionUrl(submissionId: string) {

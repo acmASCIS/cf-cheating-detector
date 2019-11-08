@@ -11,7 +11,9 @@ function App() {
       'http://localhost:3000'}/api/cheating-detection`;
     setIsLoading(true);
     try {
-      const result = await axios.post(url, data);
+      const result = await axios.post(url, data, {
+        timeout: 0,
+      });
       setCheaters(result.data);
     } catch (error) {
       alert('An error occurred.');
