@@ -65,7 +65,7 @@ export default class CheatingDetector {
 
   private async login() {
     const loginUrl = 'https://codeforces.com/enter';
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({ args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.goto(loginUrl);
 
