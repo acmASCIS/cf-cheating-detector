@@ -37,10 +37,7 @@ export default class CheatingDetector {
     const submissions: any = this.submissions
       ? this.submissions
       : await this.generateSubmissionObjects();
-    console.log(
-      'TCL: CheatingDetector -> publicrun -> submissions',
-      submissions,
-    );
+
     const codePromises = submissions.map((submission: any) =>
       this.getSourceCode(submission.id, parsedCookies),
     );
@@ -115,8 +112,7 @@ export default class CheatingDetector {
         .filter(
           submission =>
             (submission.verdict ? submission.verdict === 'OK' : false) &&
-            submission.author.participantType === 'CONTESTANT' &&
-            submission.problem.index === 'C',
+            submission.author.participantType === 'CONTESTANT'
         )
         .map(submission => ({
           id: submission.id,
