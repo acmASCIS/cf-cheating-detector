@@ -14,7 +14,7 @@ function App() {
       const result = await axios.post(url, data, {
         timeout: 0,
       });
-      setCheaters(result.data);
+      setCheaters(result.data.sort((a, b) => b.matchingPercentage - a.matchingPercentage));
     } catch (error) {
       alert('An error occurred.');
     } finally {
