@@ -4,7 +4,12 @@
   "description": "Codeforces cheating detector",
   "main": "build/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node build/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "start:client": "cd client && npm start",
+    "build": "tsc",
+    "build:client": "cd client && npm run build",
+    "postinstall": "npm run build && cd client && npm install && cd .. && npm run build:client"
   },
   "repository": {
     "type": "git",
@@ -15,5 +20,36 @@
   "bugs": {
     "url": "https://github.com/acmASCIS/cf-cheating-detector/issues"
   },
-  "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme"
+  "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme",
+  "dependencies": {
+    "@types/lodash": "^4.14.145",
+    "axios": "^0.19.0",
+    "cheerio": "^1.0.0-rc.3",
+    "codeforces-client": "0.0.1",
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "http-delayed-response": "0.0.4",
+    "lodash": "^4.17.15",
+    "puppeteer": "^2.0.0",
+    "string-similarity": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/cheerio": "^0.22.13",
+    "@types/cors": "^2.8.6",
+    "@types/express": "^4.17.2",
+    "@types/puppeteer": "^1.20.2",
+    "@types/request": "^2.48.3",
+    "@types/string-similarity": "^3.0.0",
+    "@typescript-eslint/eslint-plugin": "^2.6.1",
+    "@typescript-eslint/parser": "^2.6.1",
+    "eslint": "^6.6.0",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-config-prettier": "^6.5.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-prettier": "^3.1.1",
+    "prettier": "^1.18.2",
+    "ts-node": "^8.4.1",
+    "typescript": "^3.6.4"
+  }
 }
