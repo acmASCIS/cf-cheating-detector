@@ -2,8 +2,16 @@ import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-
+import fs from 'fs';
 import CheatingDetector from './cheating-detector';
+
+const morgan = require('morgan');
+fs.exists("access.log",function(exists){
+  if(exists){
+    fs.unlinkSync('access.log');
+  }
+});
+const logFile = fs.createWriteStream(path.join(__dirname, 'access.log'), { flags: 'a' })
 
 const parseBlackList = (line: string): Array<string> => {
   return line.split(',').map((str: string) => str.trim());
@@ -16,7 +24,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(cors());
-
+app.use(morgan('dev', {stream: logFile}))
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 app.post('/api/cheating-detection', async (req, res) => {
