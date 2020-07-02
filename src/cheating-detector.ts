@@ -113,8 +113,8 @@ export default class CheatingDetector {
         .filter(
           submission =>
             (submission.verdict ? submission.verdict === 'OK' : false) &&
-            (submission.author.participantType === 'CONTESTANT') &&
-            (this.blackList.includes(submission.problem.index) === false)
+            submission.author.participantType === 'CONTESTANT' &&
+            this.blackList.includes(submission.problem.index) === false,
         )
         .map(submission => ({
           id: submission.id,
