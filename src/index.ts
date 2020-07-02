@@ -16,12 +16,13 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 app.post('/api/cheating-detection', async (req, res) => {
-  const { groupId, contestId, matchingPercentageThreshold } = req.body;
+  const { groupId, contestId, problemsList, matchingPercentageThreshold } = req.body;
   const cheatingDetector = new CheatingDetector(
     process.env.CF_HANDLE as string,
     process.env.CF_PASSWORD as string,
     groupId,
     contestId,
+    problemsList.split(','), // split - 'A,B,C' = ['A', 'B', 'C']
     matchingPercentageThreshold,
   );
 

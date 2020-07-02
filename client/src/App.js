@@ -16,7 +16,7 @@ function App() {
       });
       setCheaters(result.data.sort((a, b) => b.matchingPercentage - a.matchingPercentage));
     } catch (error) {
-      alert('An error occurred.');
+      alert('An error occurred. \n' + error);
     } finally {
       setIsLoading(false);
     }

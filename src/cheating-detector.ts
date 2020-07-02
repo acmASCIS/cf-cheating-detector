@@ -2,7 +2,7 @@ import cheerio from 'cheerio';
 import puppeteer from 'puppeteer';
 import axios from 'axios';
 import CodeforcesClient from 'codeforces-client';
-import _ from 'lodash';
+import _, { List } from 'lodash';
 import compareCode from './compare-code';
 
 export default class CheatingDetector {
@@ -17,6 +17,7 @@ export default class CheatingDetector {
     private cfPassword: string,
     private groupId: string,
     private contestId: string,
+    private problemsList: Array<string>, // blacklist problems (To Filter)
     private requiredPercentage: number,
   ) {}
 
@@ -112,7 +113,8 @@ export default class CheatingDetector {
         .filter(
           submission =>
             (submission.verdict ? submission.verdict === 'OK' : false) &&
-            submission.author.participantType === 'CONTESTANT'
+            (submission.author.participantType === 'CONTESTANT') &&
+            (this.problemsList.includes(submission.problem.index) === false) // Filter Problems
         )
         .map(submission => ({
           id: submission.id,
