@@ -4,6 +4,17 @@ import cors from 'cors';
 import path from 'path';
 
 import CheatingDetector from './cheating-detector';
+import { List } from 'lodash';
+
+let trim: (str: string) => string = 
+    function(str :string){
+      return str.trim();
+    };
+
+let parseProblems: (line: string) => Array<string> =
+    function(line :string):  Array<string> { 
+      return  line.split(',').map(trim);
+    };
 
 const DelayedResponse = require('http-delayed-response');
 
@@ -22,7 +33,7 @@ app.post('/api/cheating-detection', async (req, res) => {
     process.env.CF_PASSWORD as string,
     groupId,
     contestId,
-    problemsList.split(','), // split - 'A,B,C' = ['A', 'B', 'C']
+    parseProblems(problemsList), // parseProblems - 'A,B,C' = ['A', 'B', 'C']
     matchingPercentageThreshold,
   );
 
