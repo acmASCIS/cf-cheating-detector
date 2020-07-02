@@ -5,6 +5,10 @@ import path from 'path';
 
 import CheatingDetector from './cheating-detector';
 
+const parseBlackList = (line: string): Array<string> => {
+  return line.split(',').map((str: string) => str.trim());
+};
+
 const DelayedResponse = require('http-delayed-response');
 
 dotenv.config();
@@ -16,12 +20,18 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 app.post('/api/cheating-detection', async (req, res) => {
-  const { groupId, contestId, matchingPercentageThreshold } = req.body;
+  const {
+    groupId,
+    contestId,
+    blackList,
+    matchingPercentageThreshold,
+  } = req.body;
   const cheatingDetector = new CheatingDetector(
     process.env.CF_HANDLE as string,
     process.env.CF_PASSWORD as string,
     groupId,
     contestId,
+    parseBlackList(blackList),
     matchingPercentageThreshold,
   );
 
@@ -44,8 +54,6 @@ app.post('/api/cheating-detection', async (req, res) => {
       return undefined;
     })(),
   );
-
-  // res.status(500).send();
 });
 
 app.get('*', (req, res) => {

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 const InputForm = ({ onSubmit, isLoading }) => {
   const [groupId, setGroupId] = useState('');
   const [contestId, setContestId] = useState('');
+  const [blackList, setBlackList] = useState('');
   const [
     matchingPercentageThreshold,
     setMatchingPercentageThreshold,
@@ -10,7 +11,7 @@ const InputForm = ({ onSubmit, isLoading }) => {
 
   const submitHandler = event => {
     event.preventDefault();
-    onSubmit({ groupId, contestId, matchingPercentageThreshold: +matchingPercentageThreshold });
+    onSubmit({ groupId, contestId, blackList, matchingPercentageThreshold: +matchingPercentageThreshold });
   };
 
   const createOnChangeHandler = setter => event => {
@@ -37,6 +38,16 @@ const InputForm = ({ onSubmit, isLoading }) => {
           placeholder="Enter Contest ID"
           value={contestId}
           onChange={createOnChangeHandler(setContestId)}
+        />
+      </div>
+       <div className="form-group">
+        <label htmlFor="blackList">Blacklist Problems</label>
+        <input
+          className="form-control"
+          id="blackList"
+          placeholder="Enter Problems To Filter A,B,C"
+          value={blackList}
+          onChange={createOnChangeHandler(setBlackList)}
         />
       </div>
       <div className="form-group">
