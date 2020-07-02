@@ -17,7 +17,7 @@ export default class CheatingDetector {
     private cfPassword: string,
     private groupId: string,
     private contestId: string,
-    private problemsList: Array<string>, // blacklist problems (To Filter)
+    private blackList: Array<string>,
     private requiredPercentage: number,
   ) {}
 
@@ -114,7 +114,7 @@ export default class CheatingDetector {
           submission =>
             (submission.verdict ? submission.verdict === 'OK' : false) &&
             (submission.author.participantType === 'CONTESTANT') &&
-            (this.problemsList.includes(submission.problem.index) === false) // Filter Problems
+            (this.blackList.includes(submission.problem.index) === false)
         )
         .map(submission => ({
           id: submission.id,

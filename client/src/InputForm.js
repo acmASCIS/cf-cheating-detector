@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const InputForm = ({ onSubmit, isLoading }) => {
   const [groupId, setGroupId] = useState('');
   const [contestId, setContestId] = useState('');
-  const [problemsList, SetProblemsToFilter] = useState('');
+  const [blackList, setBlackList] = useState('');
   const [
     matchingPercentageThreshold,
     setMatchingPercentageThreshold,

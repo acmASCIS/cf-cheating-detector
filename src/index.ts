@@ -6,7 +6,7 @@ import path from 'path';
 import CheatingDetector from './cheating-detector';
 
 
-const parseProblems = (line: string): Array<string> => {
+const parseBlackList = (line: string): Array<string> => {
   return line.split(',').map((str: string) => str.trim());
 };
 
@@ -21,13 +21,13 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../client/build')));
 
 app.post('/api/cheating-detection', async (req, res) => {
-  const { groupId, contestId, problemsList, matchingPercentageThreshold } = req.body;
+  const { groupId, contestId, blackList, matchingPercentageThreshold } = req.body;
   const cheatingDetector = new CheatingDetector(
     process.env.CF_HANDLE as string,
     process.env.CF_PASSWORD as string,
     groupId,
     contestId,
-    parseProblems(problemsList),
+    parseBlackList(blackList),
     matchingPercentageThreshold,
   );
 
