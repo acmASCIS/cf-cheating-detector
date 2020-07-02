@@ -2,7 +2,7 @@ import cheerio from 'cheerio';
 import puppeteer from 'puppeteer';
 import axios from 'axios';
 import CodeforcesClient from 'codeforces-client';
-import _, { List } from 'lodash';
+import _ from 'lodash';
 import compareCode from './compare-code';
 
 export default class CheatingDetector {

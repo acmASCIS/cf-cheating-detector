@@ -47,7 +47,7 @@ const InputForm = ({ onSubmit, isLoading }) => {
           id="blackList"
           placeholder="Enter Problems To Filter A,B,C"
           value={blackList}
-          onChange={createOnChangeHandler(setProblemsToFilter)}
+          onChange={createOnChangeHandler(setBlackList)}
         />
       </div>
       <div className="form-group">
