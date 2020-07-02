@@ -11,7 +11,7 @@ const InputForm = ({ onSubmit, isLoading }) => {
 
   const submitHandler = event => {
     event.preventDefault();
-    onSubmit({ groupId, contestId, problemsList, matchingPercentageThreshold: +matchingPercentageThreshold });
+    onSubmit({ groupId, contestId, blackList, matchingPercentageThreshold: +matchingPercentageThreshold });
   };
 
   const createOnChangeHandler = setter => event => {
@@ -41,13 +41,13 @@ const InputForm = ({ onSubmit, isLoading }) => {
         />
       </div>
        <div className="form-group">
-        <label htmlFor="problemsList">Blacklist Problems</label>
+        <label htmlFor="blackList">Blacklist Problems</label>
         <input
           className="form-control"
-          id="problemsList"
+          id="blackList"
           placeholder="Enter Problems To Filter A,B,C"
-          value={problemsList}
-          onChange={createOnChangeHandler(SetProblemsToFilter)}
+          value={blackList}
+          onChange={createOnChangeHandler(setProblemsToFilter)}
         />
       </div>
       <div className="form-group">
