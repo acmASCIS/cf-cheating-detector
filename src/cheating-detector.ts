@@ -42,7 +42,9 @@ export default class CheatingDetector {
     const codePromises = submissions.map((submission: any) =>
       this.getSourceCode(submission.id, parsedCookies),
     );
+    console.log('[CF FETCH SOURCE CODE] START');
     const codes = await Promise.all(codePromises);
+    console.log('[CF FETCH SOURCE CODE] DONE');
     submissions.forEach((submission: any, index: number) => {
       // eslint-disable-next-line no-param-reassign
       submission.code = codes[index];
@@ -56,7 +58,10 @@ export default class CheatingDetector {
     Object.values(groupedSubmissions).forEach(problemSubmissions => {
       for (let i = 0; i < problemSubmissions.length; i += 1) {
         for (let j = i + 1; j < problemSubmissions.length; j += 1) {
-          if (problemSubmissions[i].handle !== problemSubmissions[j].handle) {
+          if (
+            problemSubmissions[i].handle !== problemSubmissions[j].handle &&
+            problemSubmissions[i].index === problemSubmissions[j].index
+          ) {
             const matchingPercentage = compareCode(
               problemSubmissions[i].code,
               problemSubmissions[j].code,
@@ -81,6 +86,7 @@ export default class CheatingDetector {
   };
 
   private async login() {
+    console.log('[CF LOGIN] START');
     const loginUrl = 'https://codeforces.com/enter';
     const browser = await puppeteer.launch({
       args: ['--no-sandbox'],
@@ -96,10 +102,12 @@ export default class CheatingDetector {
     const cookies = await page.cookies();
     browser.close();
 
+    console.log('[CF LOGIN] DONE');
     return cookies;
   }
 
   private async generateSubmissionObjects() {
+    console.log('[CF FETCH SUBMISSION] START');
     const client = new CodeforcesClient(
       process.env.CF_KEY,
       process.env.CF_SECRET,
@@ -108,6 +116,7 @@ export default class CheatingDetector {
       contestId: this.contestId,
     });
 
+    console.log('[CF FETCH SUBMISSION] DONE');
     if (submissions.status === 'OK') {
       return submissions.result
         .filter(
