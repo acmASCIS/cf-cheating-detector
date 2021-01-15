@@ -39,6 +39,8 @@ app.use(express.static(path.join(__dirname, '../client/build')));
 const codesMemo = new Map<string, string>();
 
 app.post('/api/cheating-detection', async (req, res) => {
+  req.setTimeout(1000 * 60 * 5); // 5 Minutes
+
   const { groupId, contestId, blackList, matchingPercentageThreshold } = req.body;
 
   const parsedBlackList = blackList.split(',').map((str: string) => str.trim());
@@ -53,7 +55,7 @@ app.post('/api/cheating-detection', async (req, res) => {
     codesMemo,
   );
 
-  const RETRIES = process.env.RETRIES || 10;
+  const RETRIES = Number(process.env.RETRIES || 3);
 
   for (let i = 0; i < RETRIES; i += 1) {
     try {
