@@ -27,6 +27,8 @@ module.exports = {
     "@typescript-eslint/no-useless-constructor": "error",
     "no-empty-function": "off",
     "@typescript-eslint/no-empty-function": "error",
+    "import/prefer-default-export": "off",
+    "no-console": "off",
   },
   settings: {
     "import/extensions": [".js",".jsx",".ts",".tsx"],

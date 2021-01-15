@@ -3,68 +3,69 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import morgan from 'morgan';
+import basicAuth from 'express-basic-auth';
+
 import CheatingDetector from './cheating-detector';
 
-const morgan = require('morgan');
-
-fs.exists('access.log', function(exists) {
+fs.exists('access.log', exists => {
   if (exists) {
     fs.unlinkSync('access.log');
   }
 });
+
 const logFile = fs.createWriteStream(path.join(__dirname, 'access.log'), {
   flags: 'a',
 });
 
-const parseBlackList = (line: string): Array<string> => {
-  return line.split(',').map((str: string) => str.trim());
-};
-
-const DelayedResponse = require('http-delayed-response');
-
 dotenv.config();
 
 const app = express();
+
+if (process.env.BASIC_AUTH_USERNAME) {
+  app.use(
+    basicAuth({
+      users: { [process.env.BASIC_AUTH_USERNAME as string]: process.env.BASIC_AUTH_PASSWORD as string },
+      challenge: true,
+    }),
+  );
+}
+
 app.use(express.json());
 app.use(cors());
 app.use(morgan('dev', { stream: logFile }));
 app.use(express.static(path.join(__dirname, '../client/build')));
 
+const codesMemo = new Map<string, string>();
+
 app.post('/api/cheating-detection', async (req, res) => {
-  const {
-    groupId,
-    contestId,
-    blackList,
-    matchingPercentageThreshold,
-  } = req.body;
+  const { groupId, contestId, blackList, matchingPercentageThreshold } = req.body;
+
+  const parsedBlackList = blackList.split(',').map((str: string) => str.trim());
+
   const cheatingDetector = new CheatingDetector(
     process.env.CF_HANDLE as string,
     process.env.CF_PASSWORD as string,
     groupId,
     contestId,
-    parseBlackList(blackList),
+    parsedBlackList,
     matchingPercentageThreshold,
+    codesMemo,
   );
 
-  const delayed = new DelayedResponse(req, res);
-  delayed.wait();
-  delayed.end(
-    (async () => {
-      const RETRIES = 10;
-      for (let i = 0; i < RETRIES; i += 1) {
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          const result = await cheatingDetector.run();
-          return result;
-        } catch (error) {
-          console.log(`ATTEMPT [${i + 1}] FAILED.`);
-          console.log(error);
-        }
-      }
+  const RETRIES = process.env.RETRIES || 10;
 
-      return undefined;
-    })(),
-  );
+  for (let i = 0; i < RETRIES; i += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await cheatingDetector.run();
+      res.json(result);
+      break;
+    } catch (error) {
+      console.log(`ATTEMPT [${i + 1}] FAILED.`);
+      console.log(error);
+    }
+  }
 });
 
 app.get('*', (req, res) => {
@@ -72,6 +73,7 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(`Server is listening on port: ${PORT}`);
 });
