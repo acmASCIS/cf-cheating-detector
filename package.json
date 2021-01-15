@@ -23,7 +23,7 @@
   "homepage": "https://github.com/acmASCIS/cf-cheating-detector#readme",
   "dependencies": {
     "@types/lodash": "^4.14.145",
-    "axios": "^0.19.0",
+    "axios": "^0.21.1",
     "cheerio": "^1.0.0-rc.3",
     "codeforces-client": "0.0.1",
     "cors": "^2.8.5",
