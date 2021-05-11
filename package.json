@@ -31,7 +31,7 @@
     "express": "^4.17.1",
     "express-basic-auth": "^1.2.0",
     "http-delayed-response": "0.0.4",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.21",
     "morgan": "^1.10.0",
     "puppeteer": "^2.0.0",
     "string-similarity": "^3.0.0"
