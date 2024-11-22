@@ -158,6 +158,39 @@ export default class CheatingDetector {
     return this.codesMemo.get(submissionId);
   };
 
+  compareCodes = (submissions: any) => {
+    const cheatingCases: any = [];
+    const groupedSubmissions = _.groupBy(submissions, 'index');
+
+    // eslint-disable-next-line no-restricted-syntax
+    Object.values(groupedSubmissions).forEach(problemSubmissions => {
+      for (let i = 0; i < problemSubmissions.length; i += 1) {
+        for (let j = i + 1; j < problemSubmissions.length; j += 1) {
+          if (
+            problemSubmissions[i].handle !== problemSubmissions[j].handle &&
+            problemSubmissions[i].index === problemSubmissions[j].index
+          ) {
+            const matchingPercentage = compareCode(problemSubmissions[i].code, problemSubmissions[j].code);
+
+            if (matchingPercentage >= 0.3) {
+              cheatingCases.push({
+                matchingPercentage,
+                first: problemSubmissions[i],
+                second: problemSubmissions[j],
+              });
+            }
+          }
+        }
+      }
+    });
+
+    return cheatingCases.map((cheatingCase: any) => ({
+      ...cheatingCase,
+      first: _.omit(cheatingCase.first, 'code'),
+      second: _.omit(cheatingCase.second, 'code'),
+    }));
+  };
+
   private generateSubmissionUrl(submissionId: string) {
     return `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
   }
