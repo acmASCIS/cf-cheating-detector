@@ -20,6 +20,7 @@ export const scheduleJobs = async <T>(
     const startTime = process.hrtime();
 
     // eslint-disable-next-line no-await-in-loop
+    
     results.push(...(await Promise.all(currentJobs.map(job => job()))));
 
     const [seconds, ns] = process.hrtime(startTime);

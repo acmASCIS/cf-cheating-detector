@@ -1,14 +1,28 @@
 import cheerio from 'cheerio';
 import puppeteer from 'puppeteer';
+
 import axios from 'axios';
 import CodeforcesClient from 'codeforces-client';
 import _ from 'lodash';
 
 import compareCode from './compare-code';
 import { scheduleJobs } from './schedule-jobs';
+const { connect } = require('puppeteer-real-browser');
+
+
+
+// Define type for submissions with code and URL
+type SubmissionWithCode = {
+  id: string;
+  handle: string;
+  index: string;
+  code?: string;
+  url?: string;
+};
 
 export default class CheatingDetector {
   private cookies: string | undefined = undefined;
+  private page: puppeteer.Page | undefined;
 
   constructor(
     private cfUsername: string,
@@ -20,22 +34,21 @@ export default class CheatingDetector {
     private codesMemo: Map<string, string>,
   ) {}
 
+
+  // Add delay function within the class
+  private delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+
   public run = async () => {
-    let authCookies: any[];
-    let parsedCookies: string;
-
-    if (!this.cookies) {
-      authCookies = await this.login();
-      parsedCookies = authCookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
-      this.cookies = parsedCookies;
-    } else {
-      parsedCookies = this.cookies;
+    if (!this.page) {
+      this.page = await this.login();
     }
+    const submissions = await this.generateSubmissionObjects();
 
-    const submissions: any = await this.generateSubmissionObjects();
-
-    const codeJobs = submissions.map((submission: any) => () =>
-      this.getSourceCode(String(submission.id), parsedCookies),
+    const codeJobs = submissions.map(submission => () =>
+      this.getSourceCode(submission.id.toString(), this.page!), // Convert to string
     );
 
     console.log(`[CF FETCH SOURCE CODE] START: ${codeJobs.length} submissions`);
@@ -49,31 +62,34 @@ export default class CheatingDetector {
 
     console.log('[CF FETCH SOURCE CODE] DONE');
 
-    submissions.forEach((submission: any, index: number) => {
-      // eslint-disable-next-line no-param-reassign
-      submission.code = codes[index];
-      // eslint-disable-next-line no-param-reassign
-      submission.url = this.generateSubmissionUrl(submission.id);
-    });
+    const submissionsWithCode: SubmissionWithCode[] = await Promise.all(submissions.map(async (submission, index) => ({
+      id: submission.id.toString(), // Convert to string
+      handle: submission.handle,
+      index: submission.index,
+      code: await codes[index], // Await the promise to resolve
+      url: this.generateSubmissionUrl(submission.id.toString()), // Convert to string
+    })));
 
     const cheatingCases: any[] = [];
-    const groupedSubmissions = _.groupBy(submissions, 'index');
+    const groupedSubmissions = _.groupBy(submissionsWithCode, 'index');
 
-    // eslint-disable-next-line no-restricted-syntax
     Object.values(groupedSubmissions).forEach(problemSubmissions => {
-      for (let i = 0; i < problemSubmissions.length; i += 1) {
-        for (let j = i + 1; j < problemSubmissions.length; j += 1) {
+      for (let i = 0; i < problemSubmissions.length; i++) {
+        for (let j = i + 1; j < problemSubmissions.length; j++) {
           if (
             problemSubmissions[i].handle !== problemSubmissions[j].handle &&
             problemSubmissions[i].index === problemSubmissions[j].index
           ) {
-            const matchingPercentage = compareCode(problemSubmissions[i].code, problemSubmissions[j].code);
-
+            const matchingPercentage = compareCode(
+              problemSubmissions[i].code!,
+              problemSubmissions[j].code!,
+            );  
+            console.log(matchingPercentage);
             if (matchingPercentage >= this.requiredPercentage) {
               cheatingCases.push({
                 matchingPercentage,
-                first: problemSubmissions[i],
-                second: problemSubmissions[j],
+                first: _.omit(problemSubmissions[i], 'code'),
+                second: _.omit(problemSubmissions[j], 'code'),
               });
             }
           }
@@ -81,83 +97,101 @@ export default class CheatingDetector {
       }
     });
 
-    return cheatingCases.map(cheatingCase => ({
-      ...cheatingCase,
-      first: _.omit(cheatingCase.first, 'code'),
-      second: _.omit(cheatingCase.second, 'code'),
-    }));
+    return cheatingCases;
   };
 
   private async login() {
     console.log('[CF LOGIN] START');
-
     const loginUrl = 'https://codeforces.com/enter';
-    const browser = await puppeteer.launch({
-      args: ['--no-sandbox'],
-      timeout: 0,
-    });
+    const { browser } = await connect({
+      headless: false, // Run in a visible window
+      devtools: true,
+    })
     const page = await browser.newPage();
     await page.goto(loginUrl, { timeout: 0 });
 
-    await page.type('input[name="handleOrEmail"]', this.cfUsername);
-    await page.type('input[name="password"]', this.cfPassword);
+    await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
+    await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
+
     await page.click('input[type="submit"]');
     await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
-    const cookies = await page.cookies();
-    browser.close();
 
     console.log('[CF LOGIN] DONE');
-
-    return cookies;
+    return page;
   }
 
   private async generateSubmissionObjects() {
     console.log('[CF FETCH SUBMISSION] START');
-
     const client = new CodeforcesClient(process.env.CF_KEY, process.env.CF_SECRET);
-
-    const submissions = await client.contest.status({
-      contestId: this.contestId,
-    });
-
-    console.log('[CF FETCH SUBMISSION] DONE');
+    const submissions = await client.contest.status({ contestId: this.contestId });
 
     if (submissions.status !== 'OK') {
       throw new Error('API failed to fetch submissions');
     }
 
+    console.log('[CF FETCH SUBMISSION] DONE');
     return submissions.result
       .filter(
         submission =>
-          (submission.verdict ? submission.verdict === 'OK' : false) &&
+          submission.verdict === 'OK' &&
           submission.author.participantType === 'CONTESTANT' &&
-          this.blackList.includes(submission.problem.index) === false,
+          !this.blackList.includes(submission.problem.index),
       )
       .map(submission => ({
-        id: submission.id,
+        id: submission.id.toString(), // Convert to string here
         handle: submission.author.members[0].handle,
         index: submission.problem.index,
       }));
   }
 
-  private getSourceCode = async (submissionId: string, cookies: string) => {
+  private async getSourceCode(submissionId: string, page: puppeteer.Page) {
     if (this.codesMemo.get(submissionId)) {
       return this.codesMemo.get(submissionId);
     }
-
+  
     const submissionUrl = this.generateSubmissionUrl(submissionId);
+    let retries = 3;
+    let code = '';
+    
+    while (retries > 0) {
+      try {
+        // Navigate to the page and wait for the specific element to confirm the page is loaded
+        if(retries === 3) {
+          await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
+        }
 
-    const result = await axios.get(submissionUrl, {
-      headers: {
-        Cookie: cookies,
-      },
-    });
-
-    const $ = cheerio.load(result.data);
-    this.codesMemo.set(submissionId, $('.prettyprint').text());
-    return this.codesMemo.get(submissionId);
-  };
-
+        await this.delay(3000);  // delay to prevent getting banned by codeforces
+  
+        // Check if the .lang-cpp element exists on the page
+        const element = await page.$('.lang-cpp');
+        if (element) {
+          // Extract text content from the code element
+          code = await element.evaluate(el => el.textContent || '');
+          // console.log('Code extracted:', code);
+          break; // Exit loop once the code is found
+        } else {
+          console.log('Code not found on the page');
+          retries--;
+          await this.delay(3000);  // Delay before retrying
+        }
+  
+      } catch (error) {
+        console.log(`Error loading page or fetching code, retrying... (${retries} attempts left)`);
+        retries--;
+        if (retries > 0) {
+          console.log('Reloading page...');
+          await page.reload({ waitUntil: 'domcontentloaded' });  // Reload page and wait for DOM content
+        } else {
+          console.log('Failed to load the page after retries');
+          throw error; // Throw error if retries are exhausted
+        }
+      }
+    }
+  
+    this.codesMemo.set(submissionId, code); // Memoize the code for future use
+    return code;
+  }
+  
   private generateSubmissionUrl(submissionId: string) {
     return `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
   }

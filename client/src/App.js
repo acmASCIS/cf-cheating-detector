@@ -8,7 +8,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const onSubmit = async data => {
     const url = `${process.env.REACT_APP_API_URL ||
-      'http://localhost:3000'}/api/cheating-detection`;
+      'http://localhost:3030'}/api/cheating-detection`;
     setIsLoading(true);
     try {
       const result = await axios.post(url, data, {

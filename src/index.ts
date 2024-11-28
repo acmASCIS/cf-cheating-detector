@@ -8,6 +8,10 @@ import basicAuth from 'express-basic-auth';
 
 import CheatingDetector from './cheating-detector';
 
+
+
+
+
 fs.exists('access.log', exists => {
   if (exists) {
     fs.unlinkSync('access.log');

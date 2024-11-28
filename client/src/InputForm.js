@@ -8,9 +8,18 @@ const InputForm = ({ onSubmit, isLoading }) => {
     matchingPercentageThreshold,
     setMatchingPercentageThreshold,
   ] = useState('');
+  const[error, setError] = useState('');
 
   const submitHandler = event => {
     event.preventDefault();
+    // Validate matchingPercentageThreshold
+    const threshold = +matchingPercentageThreshold; 
+    if (isNaN(threshold) || threshold < 0 || threshold > 1) {
+      setError('Matching percentage must be a number between 0 and 1.');
+      return;
+    }
+
+    setError(''); 
     onSubmit({ groupId, contestId, blackList, matchingPercentageThreshold: +matchingPercentageThreshold });
   };
 
@@ -61,6 +70,7 @@ const InputForm = ({ onSubmit, isLoading }) => {
           value={matchingPercentageThreshold}
           onChange={createOnChangeHandler(setMatchingPercentageThreshold)}
         />
+        {error && <div className="text-danger">{error}</div>}
       </div>
       <button type="submit" className="btn btn-primary" disabled={isLoading}>
         {isLoading && (
