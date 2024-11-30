@@ -32,7 +32,8 @@ export default class CheatingDetector {
     private blackList: Array<string>,
     private requiredPercentage: number,
     private codesMemo: Map<string, string>,
-  ) {}
+    private loaded: boolean,
+  ) { }
 
 
   // Add delay function within the class
@@ -42,14 +43,13 @@ export default class CheatingDetector {
 
 
   public run = async () => {
-    if (!this.page) {
+    if (!this.loaded) {
       this.page = await this.login();
     }
-    const submissions = await this.generateSubmissionObjects();
-
-    const codeJobs = submissions.map(submission => () =>
-      this.getSourceCode(submission.id.toString(), this.page!), // Convert to string
-    );
+    let submissions = await this.generateSubmissionObjects();
+    const codeJobs = submissions.map((submission, index) => async () => {
+      return this.getSourceCode(submission.id.toString(), this.page!);
+    });
 
     console.log(`[CF FETCH SOURCE CODE] START: ${codeJobs.length} submissions`);
 
@@ -83,7 +83,7 @@ export default class CheatingDetector {
             const matchingPercentage = compareCode(
               problemSubmissions[i].code!,
               problemSubmissions[j].code!,
-            );  
+            );
             console.log(matchingPercentage);
             if (matchingPercentage >= this.requiredPercentage) {
               cheatingCases.push({
@@ -108,8 +108,9 @@ export default class CheatingDetector {
       devtools: true,
     })
     const page = await browser.newPage();
+    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
     await page.goto(loginUrl, { timeout: 0 });
-
+    this.loaded = true;
     await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
     await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
 
@@ -148,22 +149,22 @@ export default class CheatingDetector {
     if (this.codesMemo.get(submissionId)) {
       return this.codesMemo.get(submissionId);
     }
-  
+
     const submissionUrl = this.generateSubmissionUrl(submissionId);
     let retries = 3;
     let code = '';
-    
     while (retries > 0) {
       try {
         // Navigate to the page and wait for the specific element to confirm the page is loaded
-        if(retries === 3) {
+        if (retries === 3) {
+          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
           await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
         }
 
-        await this.delay(3000);  // delay to prevent getting banned by codeforces
-  
+        await this.delay(10000);  // delay to prevent getting banned by codeforces
+
         // Check if the .lang-cpp element exists on the page
-        const element = await page.$('.lang-cpp');
+        const element = await page.$('.prettyprint');
         if (element) {
           // Extract text content from the code element
           code = await element.evaluate(el => el.textContent || '');
@@ -172,26 +173,27 @@ export default class CheatingDetector {
         } else {
           console.log('Code not found on the page');
           retries--;
-          await this.delay(3000);  // Delay before retrying
+          await this.delay(30000);
+          await page.reload({ waitUntil: 'domcontentloaded' });   // Delay before retrying
         }
-  
+
       } catch (error) {
         console.log(`Error loading page or fetching code, retrying... (${retries} attempts left)`);
         retries--;
         if (retries > 0) {
           console.log('Reloading page...');
           await page.reload({ waitUntil: 'domcontentloaded' });  // Reload page and wait for DOM content
+          await this.delay(30000)
         } else {
           console.log('Failed to load the page after retries');
-          throw error; // Throw error if retries are exhausted
         }
       }
     }
-  
+
     this.codesMemo.set(submissionId, code); // Memoize the code for future use
     return code;
   }
-  
+
   private generateSubmissionUrl(submissionId: string) {
     return `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
   }
