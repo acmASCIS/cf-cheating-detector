@@ -161,7 +161,7 @@ export default class CheatingDetector {
           await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
         }
 
-        await this.delay(10000);  // delay to prevent getting banned by codeforces
+        await this.delay(4000);  // delay to prevent getting banned by codeforces
 
         // Check if the .lang-cpp element exists on the page
         const element = await page.$('.prettyprint');
@@ -173,7 +173,7 @@ export default class CheatingDetector {
         } else {
           console.log('Code not found on the page');
           retries--;
-          await this.delay(30000);
+          await this.delay(60000);
           await page.reload({ waitUntil: 'domcontentloaded' });   // Delay before retrying
         }
 
@@ -183,7 +183,7 @@ export default class CheatingDetector {
         if (retries > 0) {
           console.log('Reloading page...');
           await page.reload({ waitUntil: 'domcontentloaded' });  // Reload page and wait for DOM content
-          await this.delay(30000)
+          await this.delay(60000)
         } else {
           console.log('Failed to load the page after retries');
         }
