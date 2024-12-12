@@ -8,8 +8,21 @@ import _ from 'lodash';
 import compareCode from './compare-code';
 import { scheduleJobs } from './schedule-jobs';
 const { connect } = require('puppeteer-real-browser');
+import fs from 'fs';
+import path from 'path';
 
+const SUBMISSIONS_FILE_PATH = path.resolve(__dirname, 'submissions.json');
+function loadSubmissionsFromFile(): SubmissionWithCode[] {
+  if (fs.existsSync(SUBMISSIONS_FILE_PATH)) {
+    const data = fs.readFileSync(SUBMISSIONS_FILE_PATH, 'utf-8');
+    return JSON.parse(data) as SubmissionWithCode[];
+  }
+  return [];
+}
 
+function saveSubmissionsToFile(submissions: SubmissionWithCode[]): void {
+  fs.writeFileSync(SUBMISSIONS_FILE_PATH, JSON.stringify(submissions, null, 2), 'utf-8');
+}
 
 // Define type for submissions with code and URL
 type SubmissionWithCode = {
@@ -36,6 +49,8 @@ export default class CheatingDetector {
   ) { }
 
 
+  
+
   // Add delay function within the class
   private delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -46,13 +61,32 @@ export default class CheatingDetector {
     if (!this.loaded) {
       this.page = await this.login();
     }
-    let submissions = await this.generateSubmissionObjects();
+    let submissionsWithCode1 = loadSubmissionsFromFile();
+    const fetchedSubmissionIds = new Set(submissionsWithCode1.map((s) => s.id));
+    // let submissions = await this.generateSubmissionObjects();
+
+    // Fetch new submissions
+  const newSubmissions = await this.generateSubmissionObjects();
+  const submissionsToFetch = newSubmissions.filter(
+    (submission) => !fetchedSubmissionIds.has(submission.id.toString())
+  );
 
     const failedJobs: (() => Promise<string | null>)[] = [];
-    const codeJobs = submissions.map((submission) => async () => {
+    const codeJobs = submissionsToFetch.map((submission) => async () => {
       const code = await this.getSourceCode(submission.id.toString(), this.page!, this.browser!, failedJobs);
       if (!code) {
         console.log(`Submission ${submission.id} failed.`);
+      } else {
+        const newSubmission: SubmissionWithCode = {
+          id: submission.id.toString(),
+          handle: submission.handle,
+          index: submission.index,
+          code,
+          url: this.generateSubmissionUrl(submission.id.toString()),
+        };
+  
+        submissionsWithCode1.push(newSubmission);
+        saveSubmissionsToFile(submissionsWithCode1); // Save to file after each update
       }
       return code;
     });
@@ -83,16 +117,9 @@ export default class CheatingDetector {
       console.log('Failed jobs retry completed.');
     }
 
-    const submissionsWithCode: SubmissionWithCode[] = submissions.map((submission, index) => ({
-      id: submission.id.toString(),
-      handle: submission.handle,
-      index: submission.index,
-      code: codes[index],
-      url: this.generateSubmissionUrl(submission.id.toString()),
-    }));
 
     const cheatingCases: any[] = [];
-    const groupedSubmissions = _.groupBy(submissionsWithCode, 'index');
+    const groupedSubmissions = _.groupBy(submissionsWithCode1, 'index');
 
     Object.values(groupedSubmissions).forEach(problemSubmissions => {
       for (let i = 0; i < problemSubmissions.length; i++) {
@@ -141,7 +168,7 @@ export default class CheatingDetector {
         break;
       } catch (error) {
         console.log(`encountered ${error} please check page...`);
-        await this.delay(10000)
+        await this.delay(15000)
       }
     }
 
@@ -202,16 +229,8 @@ export default class CheatingDetector {
         } else {
           console.log(`Code not found. Retrying... (${retries} attempts left)`);
           retries--;
-          if (retries == 2) {
-            await this.retrylogin(browser)
-            browser = this.browser!
-            page = this.page!
-            await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
-          }
-          else {
-            await this.delay(20000);
-            await page.reload({ waitUntil: 'domcontentloaded' });
-          }
+          await this.delay(20000);
+          await page.reload({ waitUntil: 'domcontentloaded' });
         }
       } catch (error) {
         console.log(`Error fetching code: ${error}. Retrying...`);
@@ -229,52 +248,6 @@ export default class CheatingDetector {
 
     return code;
   }
-
-
-
-  private async retrylogin(browser: puppeteer.Browser) {
-    browser.close()
-    await this.delay(2 * 60 * 1000)
-    let newbrowserresponse = await connect({
-      headless: false, // Run in a visible window
-      devtools: true,
-    })
-
-    let page = await newbrowserresponse.browser.newPage();
-    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
-    await page.goto('https://codeforces.com/enter', { timeout: 0 });
-    this.loaded = true;
-    while (true) {
-      try {
-        await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
-        await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
-        await page.click('input[type="submit"]');
-        await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
-        break;
-      } catch (error) {
-        console.log(`encountered ${error} please check page here... `);
-        await this.delay(30000)
-
-        if (!await page.$('input[name="handleOrEmail"]')) {
-          newbrowserresponse.browser.close()
-          await this.delay(2 * 60 * 1000)
-          newbrowserresponse = await connect({
-            headless: false, // Run in a visible window
-            devtools: true,
-          })
-
-          page = await newbrowserresponse.browser.newPage();
-          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
-          await page.goto('https://codeforces.com/enter', { timeout: 0 });
-        }
-
-      }
-    }
-
-    this.browser = newbrowserresponse.browser
-    this.page = page
-  }
-
   private generateSubmissionUrl(submissionId: string) {
     return `https://codeforces.com/group/${this.groupId}/contest/${this.contestId}/submission/${submissionId}`;
   }
