@@ -16,14 +16,14 @@ type SubmissionWithCode = {
   id: string;
   handle: string;
   index: string;
-  code?: string;
+  code?: string | null;
   url?: string;
 };
 
 export default class CheatingDetector {
   private cookies: string | undefined = undefined;
   private page: puppeteer.Page | undefined;
-
+  private browser: puppeteer.Browser | undefined
   constructor(
     private cfUsername: string,
     private cfPassword: string,
@@ -47,8 +47,14 @@ export default class CheatingDetector {
       this.page = await this.login();
     }
     let submissions = await this.generateSubmissionObjects();
-    const codeJobs = submissions.map((submission, index) => async () => {
-      return this.getSourceCode(submission.id.toString(), this.page!);
+
+    const failedJobs: (() => Promise<string | null>)[] = [];
+    const codeJobs = submissions.map((submission) => async () => {
+      const code = await this.getSourceCode(submission.id.toString(), this.page!, this.browser!, failedJobs);
+      if (!code) {
+        console.log(`Submission ${submission.id} failed.`);
+      }
+      return code;
     });
 
     console.log(`[CF FETCH SOURCE CODE] START: ${codeJobs.length} submissions`);
@@ -56,19 +62,34 @@ export default class CheatingDetector {
     const jobsPerTimeFrame = Number(process.env.JOBS_PER_TIME_FRAME || 30);
     const timeFrame = Number(process.env.TIME_FRAME || 1000);
 
-    const codes = await scheduleJobs(codeJobs, jobsPerTimeFrame, timeFrame, remainingJobs => {
-      console.log('REMAINING CODES TO FETCH:', remainingJobs);
-    });
+    const codes = await scheduleJobs(
+      codeJobs,
+      jobsPerTimeFrame,
+      timeFrame,
+      remainingJobs => {
+        console.log('REMAINING CODES TO FETCH:', remainingJobs);
+      },
+      failedJobs => {
+        console.log(`${failedJobs.length} jobs failed. Retrying...`);
+      }
+    );
 
     console.log('[CF FETCH SOURCE CODE] DONE');
 
-    const submissionsWithCode: SubmissionWithCode[] = await Promise.all(submissions.map(async (submission, index) => ({
-      id: submission.id.toString(), // Convert to string
+    // Retry failed jobs (if any)
+    if (failedJobs.length) {
+      console.log('Retrying failed jobs...');
+      await scheduleJobs(failedJobs, jobsPerTimeFrame, timeFrame);
+      console.log('Failed jobs retry completed.');
+    }
+
+    const submissionsWithCode: SubmissionWithCode[] = submissions.map((submission, index) => ({
+      id: submission.id.toString(),
       handle: submission.handle,
       index: submission.index,
-      code: await codes[index], // Await the promise to resolve
-      url: this.generateSubmissionUrl(submission.id.toString()), // Convert to string
-    })));
+      code: codes[index],
+      url: this.generateSubmissionUrl(submission.id.toString()),
+    }));
 
     const cheatingCases: any[] = [];
     const groupedSubmissions = _.groupBy(submissionsWithCode, 'index');
@@ -111,12 +132,20 @@ export default class CheatingDetector {
     await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
     await page.goto(loginUrl, { timeout: 0 });
     this.loaded = true;
-    await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
-    await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
+    while (true) {
+      try {
+        await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
+        await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
+        await page.click('input[type="submit"]');
+        await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
+        break;
+      } catch (error) {
+        console.log(`encountered ${error} please check page...`);
+        await this.delay(10000)
+      }
+    }
 
-    await page.click('input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
-
+    this.browser = browser
     console.log('[CF LOGIN] DONE');
     return page;
   }
@@ -145,53 +174,105 @@ export default class CheatingDetector {
       }));
   }
 
-  private async getSourceCode(submissionId: string, page: puppeteer.Page) {
+  private async getSourceCode(
+    submissionId: string,
+    page: puppeteer.Page,
+    browser: puppeteer.Browser,
+    failedJobs: (() => Promise<string | null>)[] = []
+  ): Promise<string | null> {
     if (this.codesMemo.get(submissionId)) {
-      return this.codesMemo.get(submissionId);
+      return this.codesMemo.get(submissionId)!;
     }
 
     const submissionUrl = this.generateSubmissionUrl(submissionId);
-    let retries = 3;
-    let code = '';
+    let retries = 4;
+    let code: string | null = null;
+
     while (retries > 0) {
       try {
-        // Navigate to the page and wait for the specific element to confirm the page is loaded
-        if (retries === 3) {
-          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
+        if (retries === 4) {
           await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
+          await this.delay(4000); // Delay to avoid bans
         }
 
-        await this.delay(4000);  // delay to prevent getting banned by codeforces
-
-        // Check if the .lang-cpp element exists on the page
         const element = await page.$('.prettyprint');
         if (element) {
-          // Extract text content from the code element
           code = await element.evaluate(el => el.textContent || '');
-          // console.log('Code extracted:', code);
-          break; // Exit loop once the code is found
+          break;
         } else {
-          console.log('Code not found on the page');
+          console.log(`Code not found. Retrying... (${retries} attempts left)`);
           retries--;
-          await this.delay(60000);
-          await page.reload({ waitUntil: 'domcontentloaded' });   // Delay before retrying
+          if (retries == 2) {
+            await this.retrylogin(browser)
+            browser = this.browser!
+            page = this.page!
+            await page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
+          }
+          else {
+            await this.delay(20000);
+            await page.reload({ waitUntil: 'domcontentloaded' });
+          }
         }
-
       } catch (error) {
-        console.log(`Error loading page or fetching code, retrying... (${retries} attempts left)`);
+        console.log(`Error fetching code: ${error}. Retrying...`);
         retries--;
-        if (retries > 0) {
-          console.log('Reloading page...');
-          await page.reload({ waitUntil: 'domcontentloaded' });  // Reload page and wait for DOM content
-          await this.delay(60000)
-        } else {
-          console.log('Failed to load the page after retries');
-        }
+        await page.reload({ waitUntil: 'domcontentloaded' });
       }
     }
 
-    this.codesMemo.set(submissionId, code); // Memoize the code for future use
+    if (!code) {
+
+      failedJobs.push(() => this.getSourceCode(submissionId, page, browser, failedJobs));
+    } else {
+      this.codesMemo.set(submissionId, code);
+    }
+
     return code;
+  }
+
+
+
+  private async retrylogin(browser: puppeteer.Browser) {
+    browser.close()
+    await this.delay(2 * 60 * 1000)
+    let newbrowserresponse = await connect({
+      headless: false, // Run in a visible window
+      devtools: true,
+    })
+
+    let page = await newbrowserresponse.browser.newPage();
+    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
+    await page.goto('https://codeforces.com/enter', { timeout: 0 });
+    this.loaded = true;
+    while (true) {
+      try {
+        await page.type('input[name="handleOrEmail"]', this.cfUsername, { delay: 100 });
+        await page.type('input[name="password"]', this.cfPassword, { delay: 100 });
+        await page.click('input[type="submit"]');
+        await page.waitForNavigation({ waitUntil: 'load', timeout: 0 });
+        break;
+      } catch (error) {
+        console.log(`encountered ${error} please check page here... `);
+        await this.delay(30000)
+
+        if (!await page.$('input[name="handleOrEmail"]')) {
+          newbrowserresponse.browser.close()
+          await this.delay(2 * 60 * 1000)
+          newbrowserresponse = await connect({
+            headless: false, // Run in a visible window
+            devtools: true,
+          })
+
+          page = await newbrowserresponse.browser.newPage();
+          await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
+          await page.goto('https://codeforces.com/enter', { timeout: 0 });
+        }
+
+      }
+    }
+
+    this.browser = newbrowserresponse.browser
+    this.page = page
   }
 
   private generateSubmissionUrl(submissionId: string) {
