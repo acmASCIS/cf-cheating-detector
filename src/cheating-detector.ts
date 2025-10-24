@@ -153,10 +153,10 @@ export default class CheatingDetector {
     const loginUrl = 'https://codeforces.com/enter';
     const { browser } = await connect({
       headless: false, // Run in a visible window
-      devtools: true,
+      // devtools: true,
     })
     const page = await browser.newPage();
-    await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
+    // await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36");
     await page.goto(loginUrl, { timeout: 0 });
     this.loaded = true;
     while (true) {
@@ -183,6 +183,7 @@ export default class CheatingDetector {
     const submissions = await client.contest.status({ contestId: this.contestId });
 
     if (submissions.status !== 'OK') {
+      console.log(submissions);
       throw new Error('API failed to fetch submissions');
     }
 
@@ -195,7 +196,7 @@ export default class CheatingDetector {
           !this.blackList.includes(submission.problem.index),
       )
       .map(submission => ({
-        id: submission.id.toString(), // Convert to string here
+        id: submission.id.toString(), 
         handle: submission.author.members[0].handle,
         index: submission.problem.index,
       }));
