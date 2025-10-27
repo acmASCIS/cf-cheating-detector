@@ -21,8 +21,8 @@ const CheatersTable = ({ cheatingCases }) => (
           <td>{cheatingCase.first.handle}</td>
           <td>{cheatingCase.second.handle}</td>
           <td>{cheatingCase.matchingPercentage}</td>
-          <td><a href={cheatingCase.first.url}>Code</a></td>
-          <td><a href={cheatingCase.second.url}>Code</a></td>
+          <td><a href={cheatingCase.first.url} target="_blank">Code</a></td>
+          <td><a href={cheatingCase.second.url} target="_blank">Code</a></td>
         </tr>
       ))}
     </tbody>

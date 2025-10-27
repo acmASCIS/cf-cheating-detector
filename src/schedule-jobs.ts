@@ -1,17 +1,17 @@
 const sleep = (ms: number) => {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
+  return new Promise(resolve => setTimeout(resolve, ms));
 };
 
 export const scheduleJobs = async <T>(
-  jobs: (() => T)[],
+  jobs: (() => Promise<T>)[],
   maxPerTimeFrame: number,
   timeFrame: number,
   afterBatchCallback?: (remainingJobs: number) => void,
+  failedJobsCallback?: (failedJobs: (() => Promise<T>)[]) => void
 ) => {
-  const results = [];
+  const results: T[] = [];
   let remainingJobs = [...jobs];
+  let failedJobs: (() => Promise<T>)[] = [];
 
   while (remainingJobs.length) {
     const currentJobs = remainingJobs.slice(0, maxPerTimeFrame);
@@ -19,8 +19,25 @@ export const scheduleJobs = async <T>(
 
     const startTime = process.hrtime();
 
-    // eslint-disable-next-line no-await-in-loop
-    results.push(...(await Promise.all(currentJobs.map(job => job()))));
+    const batchResults = await Promise.all(currentJobs.map(async (job) => {
+      try {
+        const result = await job();
+        // Ensure result is of type T
+        return { status: 'fulfilled', value: result as T }; 
+      } catch (error) {
+        return { status: 'rejected', reason: error };
+      }
+    }));
+    
+    batchResults.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value !== undefined) {
+        results.push(result.value); // Make sure value is not undefined
+      } else {
+        failedJobs.push(currentJobs[idx]);
+      }
+    });
+    
+    
 
     const [seconds, ns] = process.hrtime(startTime);
     const ms = seconds * 1000 + ns / 1_000_000;
@@ -30,9 +47,12 @@ export const scheduleJobs = async <T>(
     }
 
     if (ms < timeFrame) {
-      // eslint-disable-next-line no-await-in-loop
       await sleep(timeFrame - ms);
     }
+  }
+
+  if (failedJobs.length > 0 && failedJobsCallback) {
+    failedJobsCallback(failedJobs);
   }
 
   return results;

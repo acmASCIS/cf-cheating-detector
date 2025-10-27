@@ -4,7 +4,7 @@
   "description": "Codeforces cheating detector",
   "main": "build/index.js",
   "scripts": {
-    "start": "node build/index.js",
+    "start": "tsc && node build/index.js",
     "start:dev": "ts-node src/index.ts",
     "start:client": "cd client && npm start",
     "build": "tsc",
@@ -34,7 +34,11 @@
     "lodash": "^4.17.15",
     "morgan": "^1.10.0",
     "puppeteer": "^2.0.0",
-    "string-similarity": "^3.0.0"
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
+    "puppeteer-real-browser": "^1.3.18",
+    "string-similarity": "^3.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/cheerio": "^0.22.13",
