@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
@@ -23,6 +24,11 @@ const logFile = fs.createWriteStream(path.join(__dirname, 'access.log'), {
 });
 
 dotenv.config();
+
+// Increase default max listeners to avoid MaxListenersExceededWarning when Puppeteer
+// creates many internal listeners (FrameManager/NetworkManager). You can tune this
+// via the NODE_MAX_LISTENERS environment variable. Setting to 0 disables the limit.
+EventEmitter.defaultMaxListeners = Number(process.env.NODE_MAX_LISTENERS) || 50;
 
 const app = express();
 

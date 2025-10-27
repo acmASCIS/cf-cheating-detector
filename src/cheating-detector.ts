@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 
 const SUBMISSIONS_FILE_PATH = path.resolve(__dirname, 'submissions.json');
+const SESSION_FILE_PATH = path.resolve(__dirname, 'session.json');
 function loadSubmissionsFromFile(): SubmissionWithCode[] {
   if (fs.existsSync(SUBMISSIONS_FILE_PATH)) {
     const data = fs.readFileSync(SUBMISSIONS_FILE_PATH, 'utf-8');
@@ -62,6 +63,7 @@ export default class CheatingDetector {
       this.page = await this.login();
     }
     let submissionsWithCode1 = loadSubmissionsFromFile();
+    console.log('Loaded', submissionsWithCode1.length, 'submissions from file.');
     const fetchedSubmissionIds = new Set(submissionsWithCode1.map((s) => s.id));
     // let submissions = await this.generateSubmissionObjects();
 
@@ -132,7 +134,6 @@ export default class CheatingDetector {
               problemSubmissions[i].code!,
               problemSubmissions[j].code!,
             );
-            console.log(matchingPercentage);
             if (matchingPercentage >= this.requiredPercentage) {
               cheatingCases.push({
                 matchingPercentage,
@@ -174,6 +175,145 @@ export default class CheatingDetector {
 
     this.browser = browser
     console.log('[CF LOGIN] DONE');
+
+    // Save session (cookies + local/session storage) to disk.
+    try {
+      await this.saveSession(page);
+    } catch (err) {
+      console.warn('Failed to save session from headful browser:', err);
+    }
+
+    // Try to relaunch a headless browser and restore session. Only close the headful
+    // browser after we successfully validated the headless one is logged in.
+    try {
+      const headlessPage = await this.relaunchHeadlessFromSavedSession('https://codeforces.com');
+      // If successful, close the headful browser and switch over
+      try {
+        await browser.close();
+      } catch (closeErr) {
+        console.warn('Failed to close headful browser after launching headless:', closeErr);
+      }
+      this.browser = (headlessPage as any)._browser || (headlessPage as any).browser ? (headlessPage as any).browser() : undefined;
+      console.log('[CF LOGIN] SWITCHED TO HEADLESS');
+      return headlessPage;
+    } catch (err) {
+      console.warn('Failed to relaunch headless from saved session, returning headful page instead:', err);
+      // Return the headful page so caller can continue using it
+      this.browser = browser;
+      return page;
+    }
+  }
+
+  // Save cookies + localStorage + sessionStorage to SESSION_FILE_PATH
+  private async saveSession(page: puppeteer.Page) {
+    try {
+      const cookies = await page.cookies();
+
+      const localStorage = await (page as any).evaluate(() => {
+        const out: Record<string, string> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key) out[key] = localStorage.getItem(key) as string;
+        }
+        return out;
+      });
+
+      const sessionStorage = await (page as any).evaluate(() => {
+        const out: Record<string, string> = {};
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key) out[key] = sessionStorage.getItem(key) as string;
+        }
+        return out;
+      });
+
+      const payload = { cookies, localStorage, sessionStorage };
+      fs.writeFileSync(SESSION_FILE_PATH, JSON.stringify(payload, null, 2), 'utf8');
+      console.log('[CF SESSION] Saved session to', SESSION_FILE_PATH);
+    } catch (err) {
+      console.warn('Error saving session:', err);
+      throw err;
+    }
+  }
+
+  // Launch a headless browser and restore saved session into a new page
+  private async relaunchHeadlessFromSavedSession(startUrl: string): Promise<puppeteer.Page> {
+    if (!fs.existsSync(SESSION_FILE_PATH)) {
+      throw new Error('No saved session file found');
+    }
+
+    const raw = fs.readFileSync(SESSION_FILE_PATH, 'utf8');
+    const data = JSON.parse(raw) as { cookies?: any[]; localStorage?: Record<string, string>; sessionStorage?: Record<string, string> };
+
+    const browser = await puppeteer.launch({ headless: false });
+    const page = await browser.newPage();
+
+    // If cookies exist, navigate to the cookie domain first and set them
+    if (Array.isArray(data.cookies) && data.cookies.length) {
+      // Navigate somewhere on the target site first so cookies can be set.
+      try {
+        await page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      } catch (gotoErr) {
+        console.warn('Headless: initial goto before setting cookies failed:', gotoErr);
+      }
+
+      // Puppeteer requires either a `url` property on each cookie or a page at the
+      // cookie's domain. To be robust, set each cookie with a fallback `url`.
+      const cookiesToSet = data.cookies.map((c: any) => {
+        // clone cookie
+        const cookie = { ...c };
+        if (!cookie.url) {
+          try {
+            const domain = cookie.domain ? cookie.domain.replace(/^\./, '') : new URL(startUrl).hostname;
+            const protocol = cookie.secure ? 'https' : 'https'; // prefer https
+            cookie.url = `${protocol}://${domain}${cookie.path || '/'}`;
+          } catch (e) {
+            cookie.url = startUrl;
+          }
+        }
+        return cookie;
+      });
+
+      // Set cookies in small batches to avoid surprises
+      try {
+        for (const c of cookiesToSet) {
+          try {
+            await page.setCookie(c as any);
+          } catch (e) {
+            // if setting a cookie fails, continue
+            // some cookies (e.g., httpOnly with weird attrs) may not be settable
+            // but that's usually OK as long as the main auth cookies are applied
+          }
+        }
+      } catch (err) {
+        console.warn('Error while setting cookies:', err);
+      }
+    }
+
+    // Navigate to startUrl and restore storage
+    await page.goto(startUrl, { waitUntil: 'domcontentloaded' });
+
+    if (data.localStorage && Object.keys(data.localStorage).length) {
+      await (page as any).evaluate((items: any) => {
+        for (const [k, v] of Object.entries(items as Record<string, string>)) {
+          localStorage.setItem(k, v);
+        }
+      }, data.localStorage);
+    }
+
+    if (data.sessionStorage && Object.keys(data.sessionStorage).length) {
+      await (page as any).evaluate((items: any) => {
+        for (const [k, v] of Object.entries(items as Record<string, string>)) {
+          sessionStorage.setItem(k, v);
+        }
+      }, data.sessionStorage);
+    }
+
+    // Reload so the app picks up restored storage/cookies
+    await page.reload({ waitUntil: 'networkidle2' });
+
+    // store browser reference on instance
+    this.browser = browser;
     return page;
   }
 
